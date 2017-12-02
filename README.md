@@ -6,11 +6,12 @@ An encrypted pastebin means the pastebin service doesn't see the pastebin data -
 
 ## Requirements
 
-* A version of NodeJS with ES6 support
+* Python 3
+* [Python SJCL](https://github.com/berlincode/sjcl)
 
 ## Installation
 
-    npm i -g pastey
+    pip install pastey
 
 ## Configuration
 

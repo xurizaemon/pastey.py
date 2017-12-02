@@ -1,0 +1,132 @@
+#!/usr/bin/env python
+"""
+Python command line client for fincham/paste & friends.
+Based on Matt Kemp's python gist client:
+    http://github.com/mattikus/pygist
+Basic usage:
+    cat file.txt | pastey
+    pastey file1 file2 file3 file4
+    pastey -p file1
+    echo 'hello world' | pastey -a
+    pastey -g 1234 > something.txt
+"""
+__author__ = 'Chris Burgess <chris.burgess@catalyst.net.nz>'
+__version__ = '0.0.12'
+__license__ = """
+Copyright (c) 2017 Chris Burgess <chris.burgess@catalyst.net.nz>
+GPL goes here
+"""
+
+import os
+import sys
+import subprocess
+import string
+import random
+from base64 import b64encode, b64decode
+import requests
+import json
+# for debugging
+from pprint import pprint
+
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+# from urllib.request import urlopen
+# from urllib.parse import urlencode
+from sjcl import SJCL
+
+class Pastey:
+
+    @staticmethod
+    def generate_key(size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
+
+    @staticmethod
+    def encrypt(content, mimetype='text/plain'):
+        key = Pastey().generate_key()
+        hash = b64encode(content.encode())
+        encrypted = SJCL().encrypt(hash, key, 1000)
+        encrypted['mime'] = mimetype
+        for k in encrypted:
+            try:
+                encrypted[k] = encrypted[k].decode('utf-8')
+            except AttributeError:
+                pass
+        encrypted = json.dumps(encrypted)
+        res = {
+                'hash': hash.decode('utf-8'),
+                'key': key,
+                'encrypted': encrypted
+            }
+        # print(res)
+        return res
+
+    def submit(data, url):
+        # get version of Pastey
+        # set user-agent
+        # submit data to url
+        # then if location header is 302, get URL
+        # print url
+        # else show error
+        version = __version__
+        print(data['encrypted'])
+        r = requests.post(url, data={'text': data['encrypted']})
+        print(r.url + '#' + data['key'])
+
+#    def fetch(url):
+#        # not implemented
+#
+#    def decrypt(content, key):
+#        # not implemented
+#
+#    def write():
+#        # not implemented
+#
+#    def display:
+#        # not implemented
+
+def main():
+    parser = ArgumentParser(description=__doc__,
+                          formatter_class=RawDescriptionHelpFormatter)
+    parser.add_argument('-v', '--version', action='version', version=__version__)
+    parser.add_argument('-d', dest='description',
+                      help='description of the gist')
+    parser.add_argument('file', nargs='*', help='file to paste to gist')
+    args = parser.parse_args()
+
+    if sys.stdin.isatty() and not args.file:
+        parser.print_help()
+        sys.exit(1)
+
+    if len(args.file) < 1:
+        contents = sys.stdin.read()
+        mimetype = 'text/plain'
+    else:
+        filename = args.file[0]
+        if not os.path.isfile(filename):
+            print("'{0}' does not exist or is not a regular file".format(filename))
+            sys.exit()
+        extension = os.path.splitext(filename)[1]
+        with open(filename) as file:
+            contents = file.read()
+            print(contents)
+            mimetype = 'text/plain'
+
+    uri = 'http://127.0.0.1:5000'
+    Pastey.submit(Pastey.encrypt(contents, mimetype), uri)
+
+if __name__ == '__main__':
+    main()
+
+# get config
+# be a CLI tool
+# parse flags
+# switch mode:
+#   if config, write config
+#   if paste, submit paste
+#
+# submit paste:
+#   if stdin, capture stdin
+#   if file, read file
+#   encrypt data if data
+#   submit encrypted data
+#   print URL
+#
